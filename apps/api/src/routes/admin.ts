@@ -13,7 +13,6 @@ import { feeBumpTransaction } from "@brandblitz/stellar";
 import { updatePayoutFeeBumpStatus } from "../db/queries/payouts";
 import { config } from "../lib/config";
 import { pool, query } from "../db/index";
-import { webhookRotationLimiter } from "../middleware/rate-limit";
 import { sessionTimeoutQueue } from "../queues/session-timeout.queue";
 
 const router = Router();

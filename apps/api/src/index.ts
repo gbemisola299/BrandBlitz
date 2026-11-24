@@ -28,6 +28,13 @@ const app = express();
 const PORT = config.PORT;
 let isShuttingDown = false;
 
+// Trust the first proxy hop (nginx) in production so req.ip reflects the real
+// client IP instead of the proxy's — req.ip backs rate limiting and anti-cheat
+// fingerprinting (see middleware/rate-limit.ts, middleware/anti-cheat.ts).
+if (config.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 // ── Security & Parsing ─────────────────────────────────────────────────────
 app.use(
   helmet({

@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -487,6 +488,11 @@ export default function AdminFraudPage() {
               {dialogAction === "resolved" ? "Resolve" : "Escalate"}{" "}
               {dialogTargetIds.length > 1 ? `${dialogTargetIds.length} flags` : "flag"}
             </DialogTitle>
+            <DialogDescription>
+              {dialogAction === "resolved"
+                ? "Resolving closes the selected flag(s) without further review."
+                : "Escalating sends the selected flag(s) for further review."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label htmlFor="reason">
@@ -535,6 +541,9 @@ export default function AdminFraudPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Override fraud score</DialogTitle>
+            <DialogDescription>
+              Sets a manual fraud score for this user, replacing the automated score.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label htmlFor="score-override-value">

@@ -22,6 +22,11 @@ const THRESHOLDS_CACHE_KEY = "config:cache:anti_cheat.thresholds";
 const THRESHOLDS_CONFIG_KEY = "anti_cheat.thresholds";
 const CACHE_TTL_SECONDS = 5;
 
+/** Drop the cached anti-cheat thresholds so the next read re-fetches from app_config. */
+export async function flushAntiCheatThresholdsCache(): Promise<void> {
+  await redis.del(THRESHOLDS_CACHE_KEY);
+}
+
 interface AntiCheatThresholds {
   min_human_reaction_ms: number;
   max_human_reaction_ms: number;

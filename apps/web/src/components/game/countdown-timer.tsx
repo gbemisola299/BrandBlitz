@@ -38,13 +38,36 @@ export function CountdownTimer({
   const progress = (timeLeftMs / totalMs) * 100;
   const isLow = seconds <= 5;
   const prevSecondsRef = React.useRef(seconds);
+  const prevPausedRef = React.useRef(isPaused);
+  const hasMountedRef = React.useRef(false);
+  const [announcement, setAnnouncement] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    if (prevPausedRef.current !== isPaused) {
+      prevPausedRef.current = isPaused;
+      setAnnouncement(isPaused ? "Timer paused" : "Timer resumed");
+    }
+  }, [isPaused]);
 
   React.useEffect(() => {
     if (isLow && seconds < prevSecondsRef.current && onTick) {
       onTick();
     }
+    if (!isPaused && seconds < prevSecondsRef.current) {
+      if (seconds === 5) {
+        setAnnouncement("5 seconds remaining");
+      } else if (seconds <= 3 && seconds > 0) {
+        setAnnouncement(`${seconds} ${seconds === 1 ? "second" : "seconds"} remaining`);
+      } else if (seconds === 0) {
+        setAnnouncement("Time expired");
+      }
+    }
     prevSecondsRef.current = seconds;
-  }, [seconds, isLow, onTick]);
+  }, [seconds, isLow, isPaused, onTick]);
 
   // Notify parent of pause state changes
   React.useEffect(() => {
@@ -53,6 +76,9 @@ export function CountdownTimer({
 
   return (
     <div className={cn("flex flex-col items-center gap-2", className)} data-tutorial="timer">
+      <span className="sr-only" aria-live="polite" role="status" aria-atomic="true">
+        {announcement}
+      </span>
       {isPaused ? (
         <span className="flex items-center gap-2 text-lg font-semibold text-amber-600">
           <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />

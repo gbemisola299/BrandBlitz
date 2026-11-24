@@ -214,9 +214,10 @@ export async function getBrandMetaById(
 
 /**
  * Fetch recent brands to use as distractor pool when generating challenge questions.
+ * Returns the 20 most recently created brands, excluding the specified brand and deleted brands.
  * Excludes the current brand and caps results at 20.
  */
-export async function getActiveDistractorBrands(excludeBrandId: string): Promise<Brand[]> {
+export async function getRecentDistractorBrands(excludeBrandId: string): Promise<Brand[]> {
   const result = await query<Brand>(
     `SELECT *
      FROM brands

@@ -22,6 +22,20 @@ function isAlreadyDismissed(badgeId: string): boolean {
   }
 }
 
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
+function getFocusable(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
 function markDismissed(badgeId: string): void {
   try {
     sessionStorage.setItem(`dismissed_badges_${badgeId}`, "true");
@@ -34,6 +48,43 @@ export function BadgeUnlockModal({ badges, onClose }: BadgeUnlockModalProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [visible, setVisible] = React.useState(false);
   const [isTransitioning, setIsTransitioning] = React.useState(false);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLElement | null>(null);
+
+  // #814: on open, move focus into the dialog and keep Tab / Shift+Tab inside it
+  // (same pattern as session-recovery-modal.tsx). On unmount, return focus to
+  // whatever opened the modal.
+  React.useEffect(() => {
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    getFocusable(dialogRef.current)[0]?.focus();
+
+    function trapTab(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const focusable = getFocusable(dialogRef.current);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const insideDialog = active instanceof HTMLElement && !!dialogRef.current?.contains(active);
+
+      if (!insideDialog) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", trapTab);
+    return () => {
+      document.removeEventListener("keydown", trapTab);
+      triggerRef.current?.focus();
+    };
+  }, []);
 
   // Filter out already-dismissed badges
   const undismissed = React.useMemo(
@@ -78,6 +129,7 @@ export function BadgeUnlockModal({ badges, onClose }: BadgeUnlockModalProps) {
   };
 
   function handleClose() {
+    triggerRef.current?.focus();
     undismissed.forEach((b) => markDismissed(b.id));
     setVisible(false);
     setTimeout(onClose, 310);
@@ -114,6 +166,7 @@ export function BadgeUnlockModal({ badges, onClose }: BadgeUnlockModalProps) {
       />
       {/* Modal */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Badge unlocked"

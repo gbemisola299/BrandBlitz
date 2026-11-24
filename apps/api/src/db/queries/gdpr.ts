@@ -118,6 +118,7 @@ export const GDPR_ERASURE_CLEARED_COLUMNS = [
   "users.embedded_wallet_address",
   "game_sessions.device_id",
   "fraud_flags.details.fingerprint",
+  "notifications.payload.tx_hash",
 ] as const;
 
 /**
@@ -170,6 +171,15 @@ export async function anonymizeUser(userId: string): Promise<void> {
       `UPDATE fraud_flags
          SET details = details - 'fingerprint', updated_at = NOW()
        WHERE user_id = $1 AND details ? 'fingerprint'`,
+      [userId]
+    );
+
+    // Strip the on-chain transaction hash from the user's notification payloads
+    // (payout_received notifications link tx_hash to the now-cleared stellar address).
+    await client.query(
+      `UPDATE notifications
+         SET payload = payload - 'tx_hash'
+       WHERE user_id = $1 AND payload ? 'tx_hash'`,
       [userId]
     );
 

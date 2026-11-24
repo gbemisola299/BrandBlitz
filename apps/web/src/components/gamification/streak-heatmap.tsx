@@ -83,6 +83,12 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
     return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
+  const formatCellAriaLabel = (dateStr: string, sessionCount: number): string => {
+    const date = new Date(dateStr.includes("T") ? dateStr : dateStr + "T00:00:00Z");
+    const formattedDate = date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    return `${formattedDate}: ${sessionCount} ${sessionCount === 1 ? "session" : "sessions"}`;
+  };
+
   const weeks = getCellGroupsByWeek();
 
   const [isMobile, setIsMobile] = useState(false);
@@ -97,9 +103,9 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
   }, []);
   const displayWeeks = isMobile ? weeks.slice(-26) : weeks;
 
-  const handleCellHover = (e: React.MouseEvent<HTMLDivElement>, date: string) => {
+  const updateTooltipPos = (target: HTMLElement, date: string) => {
     if (!date) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
     let tooltipX = rect.left + rect.width / 2; // Center tooltip initially
     const tooltipWidth = 150; // Estimated tooltip width
     const padding = 10; // Padding from screen edge
@@ -113,6 +119,14 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
     setHoveredDate(date);
   };
 
+  const handleCellHover = (e: React.MouseEvent<HTMLDivElement>, date: string) => {
+    updateTooltipPos(e.currentTarget, date);
+  };
+
+  const handleCellFocus = (e: React.FocusEvent<HTMLDivElement>, date: string) => {
+    updateTooltipPos(e.currentTarget, date);
+  };
+
   const hoveredRecord = activity.find((r) => r.date === hoveredDate);
 
   return (
@@ -123,23 +137,41 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
           style={{ gridTemplateColumns: `repeat(${displayWeeks.length}, 1fr)` }}
         >
           {displayWeeks.map((week, weekIndex) =>
-            week.map((record, dayIndex) => (
-              <div
-                key={`${weekIndex}-${dayIndex}`}
-                onMouseEnter={(e) => handleCellHover(e, record.date)}
-                onMouseLeave={() => setHoveredDate(null)}
-                className={`h-3 w-3 rounded-sm border border-[var(--border)] transition-all ${
-                  record.date
-                    ? `${getColorClass(record.session_count)} ${getDarkColorClass(record.session_count)} cursor-pointer hover:ring-2 hover:ring-[var(--primary)] hover:ring-offset-1`
-                    : "bg-slate-50 dark:bg-slate-800"
-                } ${hoveredDate === record.date ? "ring-2 ring-[var(--primary)] ring-offset-1" : ""}`}
-              />
-            ))
+            week.map((record, dayIndex) => {
+              if (!record.date) {
+                return (
+                  <div
+                    key={`${weekIndex}-${dayIndex}`}
+                    aria-hidden="true"
+                    className="h-3 w-3 rounded-sm border border-[var(--border)] bg-slate-50 transition-all dark:bg-slate-800"
+                  />
+                );
+              }
+
+              return (
+                <div
+                  key={`${weekIndex}-${dayIndex}`}
+                  tabIndex={0}
+                  role="img"
+                  aria-label={formatCellAriaLabel(record.date, record.session_count)}
+                  onMouseEnter={(e) => handleCellHover(e, record.date)}
+                  onMouseLeave={() => setHoveredDate(null)}
+                  onFocus={(e) => handleCellFocus(e, record.date)}
+                  onBlur={() => setHoveredDate(null)}
+                  className={`h-3 w-3 cursor-pointer rounded-sm border border-[var(--border)] transition-all hover:ring-2 hover:ring-[var(--primary)] hover:ring-offset-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-1 ${getColorClass(
+                    record.session_count
+                  )} ${getDarkColorClass(record.session_count)} ${
+                    hoveredDate === record.date ? "ring-2 ring-[var(--primary)] ring-offset-1" : ""
+                  }`}
+                />
+              );
+            })
           )}
         </div>
 
         {hoveredRecord && hoveredDate && (
           <div
+            role="tooltip"
             className="absolute z-50 rounded-md bg-slate-900 px-2 py-1 text-xs text-white"
             style={{
               left: `${tooltipPos.x}px`,

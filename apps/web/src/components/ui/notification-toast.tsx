@@ -91,6 +91,11 @@ export function NotificationToast({ notification, onDismiss }: NotificationToast
     clearTimer();
   };
 
+  const dismiss = () => {
+    cancelTimer();
+    onDismiss(notification.id);
+  };
+
   useEffect(() => {
     remainingRef.current = AUTO_DISMISS_MS;
     interactedRef.current = false;
@@ -100,9 +105,16 @@ export function NotificationToast({ notification, onDismiss }: NotificationToast
   }, [notification.id, onDismiss]);
 
   return (
+    /*
+     * Announcement strategy: role="alert" carries an implicit aria-live="assertive",
+     * which is appropriate for time-sensitive notifications (payouts, rank changes, badges).
+     * We intentionally omit any explicit aria-live attribute here; adding aria-live="polite"
+     * alongside role="alert" creates a conflicting live-region declaration that screen readers
+     * handle inconsistently — some honor the explicit override, others the implicit assertive
+     * role — causing announcements to be missed or duplicated (issue #806).
+     */
     <div
       role="alert"
-      aria-live="polite"
       onMouseEnter={pauseTimer}
       onMouseLeave={resumeTimer}
       onFocus={cancelTimer}
@@ -112,7 +124,7 @@ export function NotificationToast({ notification, onDismiss }: NotificationToast
       <p className="flex-1 text-[var(--foreground)]">{toastSummary(notification)}</p>
       <button
         aria-label="Dismiss notification"
-        onClick={() => onDismiss(notification.id)}
+        onClick={dismiss}
         className="leading-none text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
       >
         ✕

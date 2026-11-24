@@ -152,9 +152,14 @@ router.patch("/:userId/suspend", async (req, res) => {
   if (!updated) throw createError("Failed to suspend user", 500);
 
   await query(
-    `INSERT INTO audit_log (actor_id, action, entity, entity_key, after)
-     VALUES ($1, 'user_suspend', 'user', $2, $3)`,
-    [req.user!.sub, userId, JSON.stringify({ reason, suspendedAt: updated.suspended_at })]
+    `INSERT INTO audit_log (actor_id, action, entity, entity_key, before, after)
+     VALUES ($1, 'user_suspend', 'user', $2, $3, $4)`,
+    [
+      req.user!.sub,
+      userId,
+      JSON.stringify({ status: target.status }),
+      JSON.stringify({ reason, status: updated.status, suspendedAt: updated.suspended_at }),
+    ]
   );
 
   res.json({
@@ -254,12 +259,13 @@ router.post("/bulk-suspend", bulkActionLimiter, async (req, res) => {
         }
 
         await query(
-          `INSERT INTO audit_log (actor_id, action, entity, entity_key, after)
-           VALUES ($1, 'user_suspend', 'user', $2, $3)`,
+          `INSERT INTO audit_log (actor_id, action, entity, entity_key, before, after)
+           VALUES ($1, 'user_suspend', 'user', $2, $3, $4)`,
           [
             actorId,
             userId,
-            JSON.stringify({ reason, suspendedAt: updated.suspended_at, bulk: true }),
+            JSON.stringify({ status: target.status }),
+            JSON.stringify({ reason, status: updated.status, suspendedAt: updated.suspended_at, bulk: true }),
           ]
         );
 
@@ -288,7 +294,8 @@ router.post("/bulk-suspend", bulkActionLimiter, async (req, res) => {
             actorId,
             userId,
             JSON.stringify({
-              previousReason: target.suspension_reason,
+              status: target.status,
+              suspensionReason: target.suspension_reason,
               suspendedAt: target.suspended_at,
             }),
             JSON.stringify({ status: updated.status, bulk: true }),
@@ -335,14 +342,18 @@ router.patch("/:userId/unsuspend", async (req, res) => {
   if (!updated) throw createError("Failed to unsuspend user", 500);
 
   await query(
-    `INSERT INTO audit_log (actor_id, action, entity, entity_key, before)
-     VALUES ($1, 'user_unsuspend', 'user', $2, $3)`,
+    `INSERT INTO audit_log (actor_id, action, entity, entity_key, before, after)
+     VALUES ($1, 'user_unsuspend', 'user', $2, $3, $4)`,
     [
       req.user!.sub,
       userId,
       JSON.stringify({
-        previousReason: target.suspension_reason,
+        status: target.status,
+        suspensionReason: target.suspension_reason,
         suspendedAt: target.suspended_at,
+      }),
+      JSON.stringify({
+        status: updated.status,
       }),
     ]
   );
@@ -382,17 +393,17 @@ router.delete("/:userId/suspend", async (req, res) => {
 
   await query(
     `INSERT INTO audit_log (actor_id, action, entity, entity_key, before, after)
-     VALUES ($1, 'unsuspend', 'user', $2, $3, $4)`,
+     VALUES ($1, 'user_unsuspend', 'user', $2, $3, $4)`,
     [
       req.user!.sub,
       userId,
       JSON.stringify({
-        suspendedAt: target.suspended_at,
+        status: target.status,
         suspensionReason: target.suspension_reason,
+        suspendedAt: target.suspended_at,
       }),
       JSON.stringify({
-        suspendedAt: null,
-        suspensionReason: null,
+        status: updated.status,
       }),
     ]
   );

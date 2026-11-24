@@ -133,6 +133,11 @@ let cachedRateLimit = 200;
 let lastRateLimitFetch = 0;
 const RATE_LIMIT_CACHE_TTL = 10000; // 10 seconds
 
+/** Force the next rate-limit check to re-fetch rate_limit_requests_per_minute from config. */
+export function resetRateLimitCache(): void {
+  lastRateLimitFetch = 0;
+}
+
 async function getApiRateLimit(): Promise<number> {
   const now = Date.now();
   if (now - lastRateLimitFetch > RATE_LIMIT_CACHE_TTL) {

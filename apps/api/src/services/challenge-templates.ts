@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getBrandById, getActiveDistractorBrands } from "../db/queries/brands";
+import { getBrandById, getRecentDistractorBrands } from "../db/queries/brands";
 import {
   createChallenge,
   insertChallengeQuestions,
@@ -194,7 +194,7 @@ export async function spawnChallengeFromTemplate(
     );
     const challenge = insertResult.rows[0];
 
-    const distractorBrands = await getActiveDistractorBrands(template.brand_id);
+    const distractorBrands = await getRecentDistractorBrands(template.brand_id);
     if (distractorBrands.length === 0) {
       logger.warn("Distractor pool empty for template spawned challenge", {
         templateId,

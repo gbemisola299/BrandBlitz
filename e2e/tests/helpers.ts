@@ -119,6 +119,29 @@ export async function seedFraudFlag(
   return payload.flagId;
 }
 
+export interface StoredChallengeReport {
+  id: string;
+  challenge_id: string;
+  user_id: string;
+  reason: string;
+  details: string | null;
+}
+
+/** Reads the challenge_reports rows for a challenge. Requires an admin bearer token. */
+export async function getChallengeReports(
+  request: APIRequestContext,
+  adminToken: string,
+  challengeId: string
+): Promise<StoredChallengeReport[]> {
+  const params = new URLSearchParams({ challengeId });
+  const response = await request.get(`${API_BASE_URL}/admin/test/challenge-reports?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  expect(response.ok()).toBeTruthy();
+  const payload = (await response.json()) as { reports: StoredChallengeReport[] };
+  return payload.reports;
+}
+
 export async function makeUserAdmin(request: APIRequestContext, userId: string): Promise<void> {
   const response = await request.post(`${API_BASE_URL}/admin/test/promote-to-admin`, {
     data: { userId },

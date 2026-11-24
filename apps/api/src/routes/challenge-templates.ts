@@ -19,7 +19,7 @@ import {
   createChallenge,
   insertChallengeQuestions,
 } from "../db/queries/challenges";
-import { getBrandById, getActiveDistractorBrands } from "../db/queries/brands";
+import { getBrandById, getRecentDistractorBrands } from "../db/queries/brands";
 import { authenticate } from "../middleware/authenticate";
 import { requireCurrentTosAccepted } from "../middleware/require-tos";
 import { requireActiveUser } from "../middleware/require-active-user";
@@ -107,7 +107,7 @@ router.post(
 
     // Re-generate questions for the cloning brand using the same round structure
     // as the template but with the cloning brand's content.
-    const distractorBrands = await getActiveDistractorBrands(body.brandId);
+    const distractorBrands = await getRecentDistractorBrands(body.brandId);
     const questions = sourceQuestions.map((q) => ({
       challenge_id: challenge.id,
       round: q.round,
