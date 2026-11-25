@@ -23,6 +23,10 @@ import { logger } from "./lib/logger";
 import { config } from "./lib/config";
 import { PERMISSIONS_POLICY_HEADER } from "@brandblitz/config";
 import { handleChatUpgrade, resetChatRooms } from "./routes/challenges.chat";
+import { setLogger } from "@brandblitz/stellar";
+
+// Route @brandblitz/stellar warnings (RPC retries, skipped deposits) through the structured logger.
+setLogger(logger);
 
 const app = express();
 const PORT = config.PORT;

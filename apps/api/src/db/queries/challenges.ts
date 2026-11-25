@@ -516,6 +516,26 @@ export async function restoreChallenge(id: string): Promise<void> {
   await query("UPDATE challenges SET deleted_at = NULL, updated_at = NOW() WHERE id = $1", [id]);
 }
 
+/**
+ * Activate a challenge from a confirmed deposit, but only while it is still pending.
+ *
+ * The status guard makes this a compare-and-set. When two deliveries race for the
+ * same challenge, Postgres row-locks the UPDATE; the second one re-checks
+ * `status = 'pending_deposit'` after the first commits and matches zero rows.
+ * `deposit_tx_hash` is UNIQUE, so a transaction already attached to a different
+ * challenge raises 23505 rather than activating twice. Callers map that error to
+ * a duplicate response.
+ *
+ * @returns true if this call activated the challenge, false if it was no longer pending.
+ */
+export async function activateChallengeFromDeposit(id: string, depositTx: string): Promise<boolean> {
+  const result = await query(
+    "UPDATE challenges SET status = 'active', deposit_tx_hash = $2 WHERE id = $1 AND status = 'pending_deposit' AND deleted_at IS NULL",
+    [id, depositTx]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function updateChallengeStatus(
   id: string,
   status: ChallengeStatus,
