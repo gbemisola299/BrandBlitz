@@ -101,6 +101,19 @@ export async function recordReferralFingerprint(userId: string, req: Request): P
   await redis.set(fingerprintKey(fingerprint), userId, "EX", REFERRAL_OWNER_TTL_SECONDS);
 }
 
+/**
+ * Consume a pending referral attribution from a request.
+ *
+ * Implements a device fingerprint-collision guard with a 365-day TTL:
+ * - On signup, the device fingerprint is recorded in Redis mapping fingerprint -> userId.
+ * - If a different user later attempts to use the same fingerprint with a valid referral code,
+ *   the attribution is rejected with a 409 error code "FINGERPRINT_COLLISION" to block potential fraud.
+ * - Legitimate shared-device referrals rejected by this guard can be manually attributed by admins
+ *   via POST /admin/referrals/manual-attribution to override the collision.
+ * - All rejections are logged with the reason for audit and false-positive-rate measurement.
+ *
+ * Returns early if no code is present, allowing the fingerprint to be recorded without attribution.
+ */
 export async function consumePendingReferralAttribution(
   userId: string,
   req: Request
@@ -134,7 +147,13 @@ export async function consumePendingReferralAttribution(
 
   const existingFingerprintOwner = await redis.get(fingerprintKey(fingerprint));
   if (existingFingerprintOwner && existingFingerprintOwner !== userId) {
-    throw createError("Referral attribution rejected for this device", 409);
+    logger.warn("Referral attribution rejected - fingerprint collision", {
+      userId,
+      referrerId: referrer.id,
+      existingOwnerId: existingFingerprintOwner,
+      rejectionReason: "fingerprint_collision_guard",
+    });
+    throw createError("Referral attribution rejected for this device", 409, "FINGERPRINT_COLLISION");
   }
 
   const reverseReferral = await findReferralByReferrerAndReferred(userId, referrer.id);

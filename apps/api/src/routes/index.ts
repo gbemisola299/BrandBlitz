@@ -19,6 +19,7 @@ import adminPayoutsRoutes from "./admin/payouts";
 import adminStatsRoutes from "./admin/stats";
 import adminQueueStatsRoutes from "./admin/queue-stats";
 import adminWaitlistRoutes from "./admin/waitlist";
+import adminReferralsRoutes from "./admin/referrals";
 import adminRoutes from "./admin";
 import deleteAccountRoutes from "./me/delete-account";
 import exportDataRoutes from "./me/export-data";
@@ -61,6 +62,7 @@ export function registerRoutes(app: Express): void {
   app.use("/admin/payouts", adminPayoutsRoutes);
   app.use("/admin/stats", adminStatsRoutes);
   app.use("/admin/queue-stats", adminQueueStatsRoutes);
+  app.use("/admin/referrals", adminReferralsRoutes);
   app.use("/admin/waitlist", adminWaitlistRoutes);
   app.use("/admin/test", adminTestRoutes);
   // General admin endpoints (archive inspection, dead-letter queue triage).

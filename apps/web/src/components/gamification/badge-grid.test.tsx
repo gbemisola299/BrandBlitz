@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import { BadgeGrid, deduplicateBadges, type Badge } from "./badge-grid";
 
 const earned: Badge = {
@@ -49,6 +49,76 @@ describe("BadgeGrid", () => {
   it("renders nothing when badges array is empty", () => {
     const { container } = render(<BadgeGrid badges={[]} />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("BadgeGrid reduced-motion subscription (#842)", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
+  function mockReducedMotion(initial: boolean) {
+    const listeners = new Set<(event: { matches: boolean }) => void>();
+    const mediaQuery = {
+      matches: initial,
+      media: "(prefers-reduced-motion: reduce)",
+      addEventListener: vi.fn((_type: string, listener: (event: { matches: boolean }) => void) => {
+        listeners.add(listener);
+      }),
+      removeEventListener: vi.fn((_type: string, listener: (event: { matches: boolean }) => void) => {
+        listeners.delete(listener);
+      }),
+    };
+    window.matchMedia = vi.fn().mockReturnValue(mediaQuery) as unknown as typeof window.matchMedia;
+    return {
+      mediaQuery,
+      listeners,
+      emit(matches: boolean) {
+        mediaQuery.matches = matches;
+        listeners.forEach((listener) => listener({ matches }));
+      },
+    };
+  }
+
+  const iconWrapper = () => screen.getByAltText("First Win").parentElement as HTMLElement;
+
+  it("bounces a newly earned badge when reduced motion is not preferred", () => {
+    mockReducedMotion(false);
+    render(<BadgeGrid badges={[earned]} previouslyEarned={[]} />);
+    expect(iconWrapper().className).toContain("animate-bounce");
+  });
+
+  it("skips the bounce when reduced motion is preferred on mount", () => {
+    mockReducedMotion(true);
+    render(<BadgeGrid badges={[earned]} previouslyEarned={[]} />);
+    expect(iconWrapper().className).not.toContain("animate-bounce");
+  });
+
+  it("updates the bounce when the preference changes while mounted", () => {
+    const media = mockReducedMotion(false);
+    render(<BadgeGrid badges={[earned]} previouslyEarned={[]} />);
+    expect(iconWrapper().className).toContain("animate-bounce");
+
+    act(() => media.emit(true));
+    expect(iconWrapper().className).not.toContain("animate-bounce");
+
+    act(() => media.emit(false));
+    expect(iconWrapper().className).toContain("animate-bounce");
+  });
+
+  it("removes the change listener on unmount", () => {
+    const media = mockReducedMotion(false);
+    const { unmount } = render(<BadgeGrid badges={[earned]} previouslyEarned={[]} />);
+    expect(media.listeners.size).toBe(1);
+
+    unmount();
+    expect(media.mediaQuery.removeEventListener).toHaveBeenCalledWith(
+      "change",
+      expect.any(Function),
+    );
+    expect(media.listeners.size).toBe(0);
   });
 });
 

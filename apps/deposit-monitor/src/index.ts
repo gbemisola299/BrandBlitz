@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import { Redis } from "ioredis";
-import { fetchDepositEvents, type DepositEvent } from "@brandblitz/stellar";
+import { fetchDepositEvents, setLogger, type DepositEvent } from "@brandblitz/stellar";
 import { config } from "./config";
 import { logger } from "./logger";
 import { IndexerMetrics, createMetricsServer } from "./metrics";
+
+// Route @brandblitz/stellar warnings (RPC retries, skipped deposits) through the structured logger.
+setLogger(logger);
 
 const LAST_LEDGER_KEY = "stellar:deposit_monitor:last_ledger";
 const redis = new Redis(config.REDIS_URL, {

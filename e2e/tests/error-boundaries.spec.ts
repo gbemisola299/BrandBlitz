@@ -14,14 +14,34 @@ test.describe("Error Boundaries", () => {
     await expect(retryButton).toBeVisible();
   });
 
-  test("game-specific error boundary catches errors in challenge routes", async ({ page }) => {
-    // Navigate to a non-existent challenge that might cause a crash if not handled,
-    // or we could add a debug-error subroute to challenge.
-    // Let's just use /debug-error and assume it's caught by root for now,
-    // but the requirement was a specific one for challenge.
+  // #820: the challenge debug route throws inside /challenge/[id], so the
+  // challenge-scoped error.tsx is the boundary under test. The id is unused by
+  // the debug page, which throws before any challenge is loaded.
+  const CHALLENGE_ID = "00000000-0000-4000-8000-000000000000";
+  const CHALLENGE_ERROR_HEADING = "Challenge loading failed";
 
-    // For now, let's just verify the root one works.
-    await page.goto("/debug-error");
-    await expect(page.getByText("Something went wrong")).toBeVisible();
+  test("challenge-route error boundary catches render errors inside /challenge/[id]", async ({
+    page,
+  }) => {
+    await page.goto(`/challenge/${CHALLENGE_ID}/debug-error`);
+
+    await expect(page.getByRole("heading", { name: CHALLENGE_ERROR_HEADING })).toBeVisible();
+    await expect(page.getByText("Something went wrong")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  });
+
+  test("navigating away from a challenge error and back recovers without a stuck error state", async ({
+    page,
+  }) => {
+    await page.goto(`/challenge/${CHALLENGE_ID}/debug-error`);
+    await expect(page.getByRole("heading", { name: CHALLENGE_ERROR_HEADING })).toBeVisible();
+
+    await page.getByRole("link", { name: "Back to Challenges" }).click();
+    await page.waitForURL((url) => url.pathname === "/");
+    await expect(page.getByRole("heading", { name: CHALLENGE_ERROR_HEADING })).toHaveCount(0);
+
+    // Returning to the route renders the boundary afresh, not a stale state.
+    await page.goto(`/challenge/${CHALLENGE_ID}/debug-error`);
+    await expect(page.getByRole("heading", { name: CHALLENGE_ERROR_HEADING })).toBeVisible();
   });
 });

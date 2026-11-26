@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import axios from "axios";
 import {
   Dialog,
   DialogContent,
@@ -60,13 +61,14 @@ export function ReportModal({ challengeId, open, onOpenChange }: ReportModalProp
       const api = createApiClient();
       await api.post(`/challenges/${challengeId}/report`, {
         reason,
-        note: note.trim() || undefined,
+        // The API schema reads `details`; sending `note` is stripped silently (#823).
+        details: note.trim() || undefined,
       });
       lastSubmitRef.current = now;
       toast.success("Report submitted. Thank you for helping keep BrandBlitz safe.");
       onOpenChange(false);
-    } catch (err: any) {
-      if (err?.response?.status === 409) {
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
         toast.error("You have already reported this challenge.");
         onOpenChange(false);
       } else {
@@ -144,9 +146,12 @@ export function ReportModal({ challengeId, open, onOpenChange }: ReportModalProp
                 }}
                 placeholder="Provide any extra context..."
                 rows={3}
+                aria-describedby="report-note-counter"
                 className="w-full resize-none rounded-md border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm placeholder:text-[var(--muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               />
               <p
+                id="report-note-counter"
+                aria-live={isNearLimit ? "polite" : "off"}
                 className={`mt-1 text-right text-xs transition-colors ${
                   isAtLimit
                     ? "font-semibold text-red-600"

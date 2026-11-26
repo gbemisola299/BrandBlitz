@@ -38,12 +38,40 @@ function LockIcon() {
   );
 }
 
-function BadgeItem({ badge, isNew }: { badge: Badge; isNew: boolean }) {
-  const [showTooltip, setShowTooltip] = React.useState(false);
-  const prefersReduced =
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function readPrefersReduced(): boolean {
+  return (
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.matchMedia(REDUCED_MOTION_QUERY).matches
+  );
+}
+
+/**
+ * Tracks the user's reduced-motion preference and stays in sync when it is
+ * toggled while the component is mounted (e.g. via OS quick settings).
+ */
+function usePrefersReducedMotion(): boolean {
+  const [prefersReduced, setPrefersReduced] = React.useState(readPrefersReduced);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+
+    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+    const handleChange = (event: MediaQueryListEvent) => setPrefersReduced(event.matches);
+
+    setPrefersReduced(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return prefersReduced;
+}
+
+function BadgeItem({ badge, isNew }: { badge: Badge; isNew: boolean }) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const prefersReduced = usePrefersReducedMotion();
 
   return (
     <div

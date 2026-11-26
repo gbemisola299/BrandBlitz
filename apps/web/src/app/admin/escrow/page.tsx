@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -316,6 +317,7 @@ export default function AdminEscrowPage() {
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Operation Details</DialogTitle>
+            <DialogDescription>Read-only details for the selected escrow operation.</DialogDescription>
           </DialogHeader>
           {detailOperation && (
             <div className="space-y-4 py-4">
@@ -395,6 +397,9 @@ export default function AdminEscrowPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Export Unsigned XDR</DialogTitle>
+            <DialogDescription>
+              Unsigned transaction XDR for signing elsewhere. Nothing is submitted from here.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-gray-600">

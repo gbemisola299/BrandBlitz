@@ -115,6 +115,7 @@ export function Header() {
             className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-md transition-colors hover:bg-[var(--muted)] md:hidden"
             aria-label="Open menu"
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu-panel"
             onClick={() => setMenuOpen((prev) => !prev)}
           >
             <span className="block h-0.5 w-5 bg-[var(--foreground)] transition-transform" />

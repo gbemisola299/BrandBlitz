@@ -93,21 +93,21 @@ export async function fetchDepositEvents(
         maxDelayMs: 5_000,
       });
       if (txMeta.status !== SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
-        console.warn(`Skipping unsuccessful transaction: ${event.txHash}`, {
+        warn(`Skipping unsuccessful transaction: ${event.txHash}`, {
           status: txMeta.status,
         });
         continue;
       }
 
       if (!event.ledgerClosedAt) {
-        console.warn(`Skipping event with missing ledgerClosedAt: ${event.txHash}`);
+        warn(`Skipping event with missing ledgerClosedAt: ${event.txHash}`);
         continue;
       }
 
       const memo = (txMeta as any).memo?.text ?? null;
       const memoValidation = validateDepositMemo(memo);
       if (!memoValidation.valid) {
-        console.warn("Rejecting deposit with invalid memo", {
+        warn("Rejecting deposit with invalid memo", {
           reason: memoValidation.reason,
           memo: memo?.slice(0, 28) ?? null,
           txHash: event.txHash,
@@ -126,7 +126,7 @@ export async function fetchDepositEvents(
         createdAt: new Date(event.ledgerClosedAt).toISOString(),
       });
     } catch (err) {
-      console.warn(`Error processing deposit event ${event.txHash}:`, err);
+      warn(`Error processing deposit event ${event.txHash}:`, err);
       continue;
     }
   }

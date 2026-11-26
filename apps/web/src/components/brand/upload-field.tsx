@@ -301,6 +301,10 @@ export function UploadField({
 
   return (
     <div className={cn("space-y-2", className)}>
+      <div className="sr-only" aria-live="polite" role="status">
+        {uploadedUrl ? `${label} upload complete` : ""}
+      </div>
+
       <input
         ref={inputRef}
         type="file"

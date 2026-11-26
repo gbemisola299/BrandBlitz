@@ -46,4 +46,22 @@ router.post("/settle-challenge", async (req, res) => {
   }
 });
 
+/**
+ * GET /admin/test/challenge-reports?challengeId=<uuid>
+ * Returns the challenge_reports rows for a challenge, so e2e tests can check
+ * that a submitted report was persisted with the right reason and details (#823).
+ */
+router.get("/challenge-reports", async (req, res) => {
+  const { challengeId } = z
+    .object({ challengeId: z.string().uuid() })
+    .parse(req.query);
+  const result = await query(
+    `SELECT id, challenge_id, user_id, reason, details
+       FROM challenge_reports
+      WHERE challenge_id = $1`,
+    [challengeId]
+  );
+  res.json({ reports: result.rows });
+});
+
 export default router;

@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMuxedAddress, sponsorNewAccount, accountHasUsdcTrustline } from "./accounts";
+import {
+  createMuxedAddress,
+  sponsorNewAccount,
+  accountHasUsdcTrustline,
+  setupMultisigThreshold,
+  combineSignatures,
+} from "./accounts";
 import * as client from "./client";
 import {
+  Account,
   MuxedAccount,
   Keypair,
   TransactionBuilder,
   Operation,
   BASE_FEE,
   Asset,
+  Networks,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 // Mocks
@@ -113,9 +122,9 @@ describe("sponsorNewAccount", () => {
       .mockRejectedValue(Object.assign(new Error("Bad request"), { status: 400 }));
     (client.getHorizonServer as any).mockReturnValue({ loadAccount });
 
-    await expect(
-      sponsorNewAccount(winnerPublicKey, sponsorSecret, "testnet")
-    ).rejects.toThrow("Bad request");
+    await expect(sponsorNewAccount(winnerPublicKey, sponsorSecret, "testnet")).rejects.toThrow(
+      "Bad request"
+    );
     expect(loadAccount).toHaveBeenCalledTimes(1);
   });
 });
@@ -171,6 +180,90 @@ describe("accountHasUsdcTrustline", () => {
   });
 });
 
+// --- getAccountUsdcBalance (issue #863) ---
+describe("getAccountUsdcBalance", () => {
+  const usdc = new Asset("USDC", "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5");
+  const publicKey = "GEXAMPLEACCOUNT";
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    (client.getUsdcAsset as any).mockReturnValue(usdc);
+  });
+
+  it("returns 0n when account has no USDC trustline balance", async () => {
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue({ balances: [{ asset_type: "native" }] }),
+    });
+    expect(await getAccountUsdcBalance(publicKey, "testnet")).toBe(0n);
+  });
+
+  it("filters by both asset_code and asset_issuer — same code different issuer returns 0n", async () => {
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue({
+        balances: [
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "USDC",
+            asset_issuer: "GDIFFERENTISSUER",
+            balance: "50.0000000",
+          },
+        ],
+      }),
+    });
+    expect(await getAccountUsdcBalance(publicKey, "testnet")).toBe(0n);
+  });
+
+  it("converts a decimal balance string correctly to stroops bigint", async () => {
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue({
+        balances: [
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "USDC",
+            asset_issuer: usdc.getIssuer(),
+            balance: "100.1234567",
+          },
+        ],
+      }),
+    });
+    expect(await getAccountUsdcBalance(publicKey, "testnet")).toBe(1001234567n);
+  });
+
+  it("converts a whole-number balance string with no decimal point", async () => {
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue({
+        balances: [
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "USDC",
+            asset_issuer: usdc.getIssuer(),
+            balance: "100",
+          },
+        ],
+      }),
+    });
+    // 100 USDC = 1_000_000_000 stroops
+    expect(await getAccountUsdcBalance(publicKey, "testnet")).toBe(1_000_000_000n);
+  });
+
+  it("truncates fractional digits beyond 7 decimal places", async () => {
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue({
+        balances: [
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "USDC",
+            asset_issuer: usdc.getIssuer(),
+            balance: "1.123456789",
+          },
+        ],
+      }),
+    });
+    // Only first 7 fractional digits are taken: 1234567
+    expect(await getAccountUsdcBalance(publicKey, "testnet")).toBe(11234567n);
+  });
+});
+
 // --- Slug generation determinism regression test ---
 describe("createMuxedAddress determinism", () => {
   it("same user ID always yields the same slug", () => {
@@ -202,5 +295,152 @@ describe("createMuxedAddress determinism", () => {
     // Verify deterministic - same inputs = same output
     const slug2 = createMuxedAddress(testPublicKey, testUserId);
     expect(slug).toBe(slug2);
+  });
+});
+
+// --- setupMultisigThreshold (#861) ---
+describe("setupMultisigThreshold", () => {
+  const masterKeypair = StellarKeypair.random();
+  const signer1 = StellarKeypair.random().publicKey();
+  const signer2 = StellarKeypair.random().publicKey();
+  const signer3 = StellarKeypair.random().publicKey();
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.resetAllMocks();
+    (client.getHorizonServer as any).mockReturnValue({
+      loadAccount: vi.fn().mockResolvedValue(new Account(masterKeypair.publicKey(), "100")),
+    });
+    (client.getNetworkPassphrase as any).mockReturnValue(Networks.TESTNET);
+  });
+
+  it.each([1, 2, 3])(
+    "constructs co-signer setOptions operations before threshold setOptions for %i signer(s)",
+    async (count) => {
+      const signers = [signer1, signer2, signer3]
+        .slice(0, count)
+        .map((publicKey) => ({ publicKey, weight: 1 }));
+
+      const { txEnvelopeXdr, txHash } = await setupMultisigThreshold(
+        masterKeypair.publicKey(),
+        signers,
+        Math.min(2, count),
+        masterKeypair.secret(),
+        "testnet"
+      );
+
+      const parsed = TransactionBuilder.fromXDR(txEnvelopeXdr, Networks.TESTNET);
+      expect(parsed.operations).toHaveLength(count + 1);
+
+      for (let i = 0; i < count; i++) {
+        const op = parsed.operations[i] as Operation.SetOptions;
+        expect(op.type).toBe("setOptions");
+        expect(op.signer).toEqual({
+          ed25519PublicKey: signers[i].publicKey,
+          weight: 1,
+        });
+      }
+
+      const thresholdOp = parsed.operations[count] as Operation.SetOptions;
+      expect(thresholdOp.type).toBe("setOptions");
+      expect(thresholdOp.lowThreshold).toBe(1);
+      expect(thresholdOp.medThreshold).toBe(Math.min(2, count));
+      expect(thresholdOp.highThreshold).toBe(Math.min(2, count));
+      expect(thresholdOp.masterWeight).toBe(1);
+
+      expect(txHash).toBe(parsed.hash().toString("hex"));
+    }
+  );
+
+  it("throws when signers.length exceeds Stellar's 20-signer limit", async () => {
+    const signers = Array.from({ length: 21 }, () => ({
+      publicKey: StellarKeypair.random().publicKey(),
+      weight: 1,
+    }));
+
+    await expect(
+      setupMultisigThreshold(
+        masterKeypair.publicKey(),
+        signers,
+        2,
+        masterKeypair.secret(),
+        "testnet"
+      )
+    ).rejects.toThrow(/20/);
+  });
+
+  it("throws when threshold or signer weight is outside the valid 0-255 range", async () => {
+    await expect(
+      setupMultisigThreshold(
+        masterKeypair.publicKey(),
+        [{ publicKey: signer1, weight: 1 }],
+        256,
+        masterKeypair.secret(),
+        "testnet"
+      )
+    ).rejects.toThrow(/0 and 255/);
+
+    await expect(
+      setupMultisigThreshold(
+        masterKeypair.publicKey(),
+        [{ publicKey: signer1, weight: -1 }],
+        1,
+        masterKeypair.secret(),
+        "testnet"
+      )
+    ).rejects.toThrow(/0 and 255/);
+  });
+});
+
+// --- combineSignatures (#859, #860) ---
+describe("combineSignatures", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function buildSignedTx(source: Keypair, sequence: string, signers: Keypair[]): string {
+    const account = new Account(source.publicKey(), sequence);
+    const tx = new TransactionBuilder(account, {
+      fee: BASE_FEE,
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(
+        Operation.setOptions({
+          homeDomain: "brandblitz.example",
+        })
+      )
+      .setTimeout(300)
+      .build();
+
+    for (const kp of signers) {
+      tx.sign(kp);
+    }
+    return tx.toEnvelope().toXDR("base64");
+  }
+
+  it("recombines two separately signed v1 (txTypeTx) envelopes and round-trips through fromXDR", async () => {
+    const source = StellarKeypair.random();
+    const cosigner = StellarKeypair.random();
+
+    const env1 = buildSignedTx(source, "500", [source]);
+    const env2 = buildSignedTx(source, "500", [cosigner]);
+
+    const combinedXdr = await combineSignatures([env1, env2]);
+
+    const rawEnvelope = xdr.TransactionEnvelope.fromXDR(combinedXdr, "base64");
+    expect(rawEnvelope.switch()).toBe(xdr.EnvelopeType.envelopeTypeTx());
+
+    const parsed = TransactionBuilder.fromXDR(combinedXdr, Networks.TESTNET);
+    expect(parsed.signatures).toHaveLength(2);
+  });
+
+  it("throws with the mismatched envelope index when given envelopes for two different transactions", async () => {
+    const source = StellarKeypair.random();
+    const cosigner = StellarKeypair.random();
+
+    const envTx1 = buildSignedTx(source, "500", [source]);
+    const envTx2 = buildSignedTx(source, "501", [cosigner]);
+
+    await expect(combineSignatures([envTx1, envTx2])).rejects.toThrow(/index 1/i);
   });
 });

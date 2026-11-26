@@ -83,6 +83,12 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
     return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
   };
 
+  const formatCellAriaLabel = (dateStr: string, sessionCount: number): string => {
+    const date = new Date(dateStr.includes("T") ? dateStr : dateStr + "T00:00:00Z");
+    const formattedDate = date.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    return `${formattedDate}: ${sessionCount} ${sessionCount === 1 ? "session" : "sessions"}`;
+  };
+
   const weeks = getCellGroupsByWeek();
 
   const [isMobile, setIsMobile] = useState(false);
@@ -97,9 +103,9 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
   }, []);
   const displayWeeks = isMobile ? weeks.slice(-26) : weeks;
 
-  const handleCellHover = (e: React.MouseEvent<HTMLDivElement>, date: string) => {
+  const updateTooltipPos = (target: HTMLElement, date: string) => {
     if (!date) return;
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
     let tooltipX = rect.left + rect.width / 2; // Center tooltip initially
     const tooltipWidth = 150; // Estimated tooltip width
     const padding = 10; // Padding from screen edge
@@ -111,6 +117,14 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
     }
     setTooltipPos({ x: tooltipX, y: rect.top });
     setHoveredDate(date);
+  };
+
+  const handleCellHover = (e: React.MouseEvent<HTMLDivElement>, date: string) => {
+    updateTooltipPos(e.currentTarget, date);
+  };
+
+  const handleCellFocus = (e: React.FocusEvent<HTMLDivElement>, date: string) => {
+    updateTooltipPos(e.currentTarget, date);
   };
 
   const hoveredRecord = activity.find((r) => r.date === hoveredDate);
@@ -141,6 +155,7 @@ export function StreakHeatmap({ activity }: StreakHeatmapProps) {
 
         {hoveredRecord && hoveredDate && (
           <div
+            role="tooltip"
             className="absolute z-50 rounded-md bg-slate-900 px-2 py-1 text-xs text-white"
             style={{
               left: `${tooltipPos.x}px`,

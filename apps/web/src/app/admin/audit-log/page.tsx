@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -344,6 +350,9 @@ export default function AdminAuditLogPage() {
                       <DialogTitle>
                         {entries.find((e) => e.id === expandedId)?.action} Details
                       </DialogTitle>
+                      <DialogDescription>
+                        Read-only record of this audit log entry.
+                      </DialogDescription>
                     </DialogHeader>
                     {(() => {
                       const entry = entries.find((e) => e.id === expandedId);

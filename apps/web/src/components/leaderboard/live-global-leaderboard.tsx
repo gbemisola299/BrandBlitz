@@ -348,6 +348,7 @@ export function LiveGlobalLeaderboard({
       )}
 
       <table className="w-full text-sm">
+        <caption className="sr-only">Global leaderboard</caption>
         <thead>
           <tr className="border-b border-[var(--border)]">
             <th className="px-6 py-3 text-left font-medium text-[var(--muted-foreground)]">Rank</th>

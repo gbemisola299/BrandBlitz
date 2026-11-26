@@ -63,25 +63,68 @@ const AUTO_DISMISS_MS = 5000;
 
 export function NotificationToast({ notification, onDismiss }: NotificationToastProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remainingRef = useRef(AUTO_DISMISS_MS);
+  const startedAtRef = useRef(0);
+  const interactedRef = useRef(false);
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const pauseTimer = () => {
+    if (!timerRef.current) return;
+    remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAtRef.current));
+    clearTimer();
+  };
+
+  const resumeTimer = () => {
+    if (interactedRef.current || timerRef.current) return;
+    startedAtRef.current = Date.now();
+    timerRef.current = setTimeout(() => onDismiss(notification.id), remainingRef.current);
+  };
+
+  const cancelTimer = () => {
+    interactedRef.current = true;
+    clearTimer();
+  };
+
+  const dismiss = () => {
+    cancelTimer();
+    onDismiss(notification.id);
+  };
 
   useEffect(() => {
+    remainingRef.current = AUTO_DISMISS_MS;
+    interactedRef.current = false;
+    startedAtRef.current = Date.now();
     timerRef.current = setTimeout(() => onDismiss(notification.id), AUTO_DISMISS_MS);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+    return clearTimer;
   }, [notification.id, onDismiss]);
 
   return (
+    /*
+     * Announcement strategy: role="alert" carries an implicit aria-live="assertive",
+     * which is appropriate for time-sensitive notifications (payouts, rank changes, badges).
+     * We intentionally omit any explicit aria-live attribute here; adding aria-live="polite"
+     * alongside role="alert" creates a conflicting live-region declaration that screen readers
+     * handle inconsistently — some honor the explicit override, others the implicit assertive
+     * role — causing announcements to be missed or duplicated (issue #806).
+     */
     <div
       role="alert"
-      aria-live="polite"
+      onMouseEnter={pauseTimer}
+      onMouseLeave={resumeTimer}
+      onFocus={cancelTimer}
       className="animate-in slide-in-from-right-4 flex w-72 items-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-sm shadow-lg duration-300"
     >
       <span className="mt-0.5 text-xl leading-none">{ICONS[notification.type]}</span>
       <p className="flex-1 text-[var(--foreground)]">{toastSummary(notification)}</p>
       <button
         aria-label="Dismiss notification"
-        onClick={() => onDismiss(notification.id)}
+        onClick={dismiss}
         className="leading-none text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
       >
         ✕

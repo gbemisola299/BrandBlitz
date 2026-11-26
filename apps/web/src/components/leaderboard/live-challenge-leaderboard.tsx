@@ -18,6 +18,7 @@ export function LiveChallengeLeaderboard({
   const { entries } = useLiveLeaderboard({ challengeId, initial });
   const prevRankByUserRef = useRef<Map<string, number>>(new Map());
   const [changedUsers, setChangedUsers] = useState<Set<string>>(new Set());
+  const [announcement, setAnnouncement] = useState("");
   const celebratedMilestonesRef = useRef<Set<string>>(new Set());
 
   const rows = useMemo(() => {
@@ -37,6 +38,12 @@ export function LiveChallengeLeaderboard({
     }
     if (changed.size === 0) return;
     setChangedUsers(changed);
+    setAnnouncement(
+      rows
+        .filter((row) => changed.has(row._key))
+        .map((row) => `${row.displayName ?? row.username} moved to rank ${row.rank}`)
+        .join(". ")
+    );
     const t = window.setTimeout(() => setChangedUsers(new Set()), 600);
     return () => window.clearTimeout(t);
   }, [rows]);
@@ -109,31 +116,37 @@ export function LiveChallengeLeaderboard({
   }, [rows, userIdentifier, challengeId, session?.user]);
 
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-[var(--border)]">
-          <th className="px-6 py-3 text-left text-[var(--muted-foreground)]">Rank</th>
-          <th className="px-6 py-3 text-left text-[var(--muted-foreground)]">Player</th>
-          <th className="px-6 py-3 text-right text-[var(--muted-foreground)]">Score</th>
-          <th className="px-6 py-3 text-right text-[var(--muted-foreground)]">Est. Payout</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((entry) => (
-          <tr
-            key={entry._key}
-            className={[
-              "border-b border-[var(--border)] transition-colors last:border-0",
-              changedUsers.has(entry._key) ? "bg-[var(--muted)]" : "",
-            ].join(" ")}
-          >
-            <td className="px-6 py-3 font-bold">#{entry.rank}</td>
-            <td className="px-6 py-3">{entry.displayName ?? entry.username}</td>
-            <td className="px-6 py-3 text-right font-mono">{formatScore(entry.totalScore)}</td>
-            <td className="px-6 py-3 text-right text-green-600">{"—"}</td>
+    <>
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+      <table className="w-full text-sm">
+        <caption className="sr-only">Live leaderboard for this challenge</caption>
+        <thead>
+          <tr className="border-b border-[var(--border)]">
+            <th className="px-6 py-3 text-left text-[var(--muted-foreground)]">Rank</th>
+            <th className="px-6 py-3 text-left text-[var(--muted-foreground)]">Player</th>
+            <th className="px-6 py-3 text-right text-[var(--muted-foreground)]">Score</th>
+            <th className="px-6 py-3 text-right text-[var(--muted-foreground)]">Est. Payout</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((entry) => (
+            <tr
+              key={entry._key}
+              className={[
+                "border-b border-[var(--border)] transition-colors last:border-0",
+                changedUsers.has(entry._key) ? "bg-[var(--muted)]" : "",
+              ].join(" ")}
+            >
+              <td className="px-6 py-3 font-bold">#{entry.rank}</td>
+              <td className="px-6 py-3">{entry.displayName ?? entry.username}</td>
+              <td className="px-6 py-3 text-right font-mono">{formatScore(entry.totalScore)}</td>
+              <td className="px-6 py-3 text-right text-green-600">{"—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

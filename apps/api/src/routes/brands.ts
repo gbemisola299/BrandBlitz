@@ -9,7 +9,7 @@ import {
   getPublicBrandChallenges,
   getPublicBrandStats,
   getBrandMetaById,
-  getActiveDistractorBrands,
+  getRecentDistractorBrands,
   toBrandApi,
   toPublicBrandApi,
   updateBrand,
@@ -447,7 +447,7 @@ router.patch("/:id/challenges/:challengeId/licensing", authenticate, async (req,
 router.get("/:id/distractors", authenticate, async (req, res) => {
   const { brand } = await assertBrandRole(req.params.id, req.user!.sub, req.user?.email, "viewer");
 
-  const distractors = (await getActiveDistractorBrands(brand.id))
+  const distractors = (await getRecentDistractorBrands(brand.id))
     .slice(0, 3)
     .map(({ id, name, logo_url }) => ({ id, name, logo_url }));
 
@@ -823,7 +823,7 @@ router.post("/:id/questions/preview", authenticate, questionPreviewLimiter, asyn
 
   const { count } = QuestionPreviewSchema.parse(req.body);
 
-  const distractorBrands = await getActiveDistractorBrands(brand.id);
+  const distractorBrands = await getRecentDistractorBrands(brand.id);
   const questions = generateQuestionPreview(brand, distractorBrands, count);
 
   res.json({ questions });
@@ -849,7 +849,7 @@ router.post("/:id/questions/:questionId/regenerate", authenticate, async (req, r
   const challenge = await getBrandById(brand.id);
   if (!challenge) throw createError("Brand not found", 404);
 
-  const distractorBrands = await getActiveDistractorBrands(brand.id);
+  const distractorBrands = await getRecentDistractorBrands(brand.id);
   const regenerated = generateChallengeQuestions(existing.challenge_id, brand, distractorBrands);
   const newDraft = regenerated.find((q) => q.round === existing.round) ?? regenerated[0];
 
@@ -1013,7 +1013,7 @@ router.post("/challenges", authenticate, requireCurrentTosAccepted, async (req, 
     }
   }
 
-  const distractorBrands = await getActiveDistractorBrands(body.brandId);
+  const distractorBrands = await getRecentDistractorBrands(body.brandId);
   if (distractorBrands.length === 0) {
     logger.warn("Distractor pool is empty; using fallback options for generated questions", {
       brandId: body.brandId,
